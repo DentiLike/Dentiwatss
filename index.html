@@ -1,5 +1,93 @@
 <!doctype html>
+<html lang="es">
+<head>
 <meta charset="utf-8">
-<title>Tablero pacientes</title>
-<meta http-equiv="refresh" content="0; url=https://wider-exposure-prepare-regions.trycloudflare.com/">
-<p>Abriendo el tablero…</p>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1f6f78">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>Tablero · Dentilike</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:linear-gradient(160deg,#f6efe6,#e8f3f3);color:#24484d}
+  .card{background:#fff;border-radius:20px;padding:2.2rem 1.6rem;width:min(88vw,360px);text-align:center;box-shadow:0 10px 30px rgba(31,111,120,.15)}
+  h1{margin:0 0 .3rem;font-size:1.45rem;color:#1f6f78}
+  .sub{margin:0 0 1.8rem;color:#6b8a8d;font-size:.95rem}
+  button{width:100%;padding:.95rem 1rem;border:0;border-radius:999px;background:#1f6f78;color:#fff;font-size:1.05rem;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.55;cursor:wait}
+  #msg{min-height:1.4em;margin:1rem 0 0;font-size:.92rem;color:#a14a3b}
+  a{color:#1f6f78;font-size:.9rem}
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Tablero de pacientes</h1>
+  <p class="sub">Dentilike · Dr. Miguel Alvarado</p>
+  <button id="btn" disabled>Entrar con Google</button>
+  <p id="msg" role="status">Cargando…</p>
+  <a id="otra" href="#" hidden>Usar otra cuenta</a>
+</main>
+<script type="module">
+// ▼▼▼ ÚNICA LÍNEA A EDITAR si cambia la dirección del túnel (sin "/" al final) ▼▼▼
+const TABLERO = "https://wider-exposure-prepare-regions.trycloudflare.com";
+// ▲▲▲
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
+const auth = getAuth(initializeApp({
+  apiKey: "AIzaSyC7mj0g7Kodn1nF0jgmLLERfs4BTN0ijT8",
+  authDomain: "dentiwhatss.firebaseapp.com",
+  projectId: "dentiwhatss",
+  appId: "1:459122054097:web:f22e51cee01508b17646f0",
+}));
+auth.languageCode = "es";
+const PERMITIDOS = ["dr.alvarado.ortodoncia@gmail.com", "dentilike.slp@gmail.com"]; // solo aviso; el servidor valida
+const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: "select_account" });
+const $ = (id) => document.getElementById(id);
+const btn = $("btn"), msg = (t) => ($("msg").textContent = t || "");
+const ok = (u) => u && u.emailVerified && PERMITIDOS.includes((u.email || "").toLowerCase());
+
+async function entrar(user) {
+  if (!ok(user)) {
+    msg("La cuenta " + (user && user.email || "") + " no tiene acceso.");
+    await signOut(auth); return;
+  }
+  btn.disabled = true; msg("Abriendo el tablero…");
+  const token = await user.getIdToken(true);
+  location.replace(TABLERO + "/auth#t=" + encodeURIComponent(token));
+}
+
+function fallo(e) {
+  btn.disabled = false;
+  const c = (e && e.code) || "";
+  if (c.includes("popup-closed") || c.includes("cancelled-popup")) return msg("");
+  msg("No se pudo iniciar sesión (" + (c || e) + "). Si abrió el enlace desde WhatsApp, ábralo en Chrome o Safari.");
+}
+
+btn.onclick = () => {
+  msg("");
+  if (ok(auth.currentUser)) return entrar(auth.currentUser).catch(fallo);
+  btn.disabled = true;
+  signInWithPopup(auth, provider).then((r) => entrar(r.user)).catch((e) => {
+    const c = (e && e.code) || "";
+    if (c.includes("popup-blocked") || c.includes("operation-not-supported")) return signInWithRedirect(auth, provider).catch(fallo);
+    fallo(e);
+  });
+};
+
+$("otra").onclick = (ev) => { ev.preventDefault(); signOut(auth); };
+
+getRedirectResult(auth).then((r) => r && entrar(r.user)).catch(fallo);
+let primera = true;
+onAuthStateChanged(auth, (u) => {
+  if (primera) { primera = false; msg(""); }
+  btn.disabled = false;
+  $("otra").hidden = !u;
+  btn.textContent = ok(u) ? "Continuar como " + u.email : "Entrar con Google";
+  if (u && !ok(u)) entrar(u);
+});
+</script>
+</body>
+</html>
